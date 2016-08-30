@@ -18,6 +18,7 @@ const mongodb = require('mongodb')
 const gju = require('geojson-utils')
 const nodemailer = require('nodemailer')
 const Grid = require('gridfs')
+const GridStream = require('gridfs-stream')
 
 
 module.exports = (() => {
@@ -34,7 +35,7 @@ module.exports = (() => {
     let app = express()
 
     let dbURI = process.env.MONGODB_URI || defaultDBConnection
-    let db, grid
+    let db, grid, gridStream
 
     console.log('dbURI', dbURI)
     mongoClient.connect(dbURI)
@@ -42,6 +43,7 @@ module.exports = (() => {
             console.log('connected to mongo')
             db = ddb
             grid = Grid(db, mongodb)
+            gridStream = GridStream(db, mongodb)
         })
         .catch(er => {
             console.log('error connecting to mongo', er)
