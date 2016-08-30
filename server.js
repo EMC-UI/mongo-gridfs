@@ -34,14 +34,14 @@ module.exports = (() => {
     let app = express()
 
     let dbURI = process.env.MONGODB_URI || defaultDBConnection
-    let db,grid
+    let db, grid
 
     console.log('dbURI', dbURI)
     mongoClient.connect(dbURI)
         .then(ddb => {
             console.log('connected to mongo')
             db = ddb
-            grid = Grid(db,mongo)
+            grid = Grid(db, mongodb)
         })
         .catch(er => {
             console.log('error connecting to mongo', er)
@@ -57,103 +57,64 @@ module.exports = (() => {
     app.use(express.static('.'))
     app.use(busboy())
 
-    let getData = (req, res) => {
-        db.collection(mongoCollectionName)
-            .find({})
-            .sort({
-                dateTime: -1
-            })
-            .limit(1)
-            .toArray()
-            .then(queryResult => {
-                if (!queryResult || queryResult.length <= 0) {
-                    res.status(404).json({
-                        "result": "no data for you"
-                    })
-                } else {
-                    res.json({
-                        data: queryResult
-                    })
-                }
-            })
-            .catch(err => {
-                console.log("error", err)
-                res.status(500).json({
-                    "error": err
-                })
-            })
-    }
-
     let saveImage = (req, res) => {
         console.log('handling')
         req.pipe(req.busboy)
         let fdata = []
         let allFileData;
-        req.busboy.on('file', (fieldname, f, filename) => {
-            f.on('data', data => {
+        req.busboy.on('file', (fieldname, readableStream, filename) => {
+
+            readableStream.on('data', data => {
                 fdata.push(data)
             })
-            f.on('end', () => {
+            readableStream.on('end', () => {
                 allFileData = Buffer.concat(fdata)
-                let rec = {
-                    "name": filename,
-                    "data": allFileData
+
+                let cfg = {
+                    filename: filename
                 }
-                db.collection('images').insertOne(rec)
-                    .then(insertResult => {
-                        res.status(201).json({
-                            "insertResult": insertResult
+                grid.writeFile(cfg, allFileData, (err, file) => {
+                    if (err) {
+                        console.log('error writing', err)
+                        res.status(500).json({
+                            "error": err
                         })
-                    })
+                    } else {
+                        console.log('saved %s to GridFS file %s', filename, file._id);
+                        res.json({
+                            'result': 'saved to GridFS file '
+                        })
+                    }
+                })
             })
+
         })
     }
 
 
     let getImage = (req, res) => {
-        db.collection('images').findOne()
-            .then(result => {
-                var data = new Buffer(result.data.buffer).toString('base64');
-                console.log('data len', data.length)
-                res.json({
-                    data: data
-                })
-            })
-            .catch(err => {
-                console.log('err', err)
-            })
-
-    }
-
-
-    let setData = (req, res) => {
-        console.log('body ', req.body);
-        if (!req.body) {
-            console.log('body is missing')
-            res.status(500).json({
-                "error": "missing body"
-            })
-            return false
+        let cfg = {
+            filename: 'Lennon-Core-Services-Architecture.png'
         }
-
-        req.body.dateTime = moment().toDate()
-        db.collection(mongoCollectionName).insertOne(req.body)
-            .then((insertResult) => {
-                res.status(201).json({
-                    "insertResult": insertResult
-                })
-            })
-            .catch((er) => {
-                console.log('error on insert', er)
+        grid.readFile(cfg, (err, fileBuffer) => {
+            if (err) {
+                console.log('error reading', err, err.stack)
                 res.status(500).json({
-                    "error": er
+                    "error": err
                 })
-            })
+            } else {
+                console.log('buffer len', fileBuffer.length)
+                let encodedData = fileBuffer.toString('base64')
+                res.json({
+                    data: encodedData
+                })
+            }
+        })
     }
+
+
 
     app.post('/saveimage', saveImage)
-    app.post(serviceURL, setData)
-    app.get(serviceURL, getData)
     app.get('/image', getImage)
 
     app.listen(port, '0.0.0.0', () => {
