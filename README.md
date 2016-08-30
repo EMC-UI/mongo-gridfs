@@ -1,3 +1,5 @@
-# angular template
+# gridfs
 
-This is my personal angular, mongo, express, node template that I use for misc apps.  Nothing to see here.
+
+storing and retrieving files in mongo with gridfs
+
