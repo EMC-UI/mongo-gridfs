@@ -86,10 +86,23 @@ module.exports = (() => {
 
     }
 
+    let getImageInfos = (req,res) => {
+      db.collection('fs.files').find({}).toArray()
+        .then(results => {
+          res.json(results)
+        })
+        .catch(err => {
+          res.status(500).json({
+            error: err
+          })
+        })
+    }
+
 
     let getImage = (req, res) => {
+        console.log(req.query)
         let cfg = {
-            filename: 'Lennon-Core-Services-Architecture.png'
+            filename: req.query.filename
         }
         grid.readFile(cfg, (err, fileBuffer) => {
             if (err) {
@@ -111,6 +124,7 @@ module.exports = (() => {
 
     app.post('/saveimage', upload.single('file'), saveImage)
     app.get('/image', getImage)
+    app.get('/imageInfos', getImageInfos)
 
     app.listen(port, '0.0.0.0', () => {
         console.log(`listening on ${port}`)
