@@ -2,7 +2,7 @@
 
 'use strict'
 
-const busboy = require('connect-busboy')
+const multer = require('multer')
 const restClient = require('request-promise')
 const express = require('express')
 const morgan = require('morgan')
@@ -19,6 +19,9 @@ const gju = require('geojson-utils')
 const nodemailer = require('nodemailer')
 const Grid = require('gridfs')
 const GridStream = require('gridfs-stream')
+var upload = multer({
+    storage: multer.memoryStorage()
+})
 
 
 module.exports = (() => {
@@ -57,39 +60,30 @@ module.exports = (() => {
     });
 
     app.use(express.static('.'))
-    app.use(busboy())
 
     let saveImage = (req, res) => {
         console.log('handling')
-        req.pipe(req.busboy)
+        console.log('we have req.file', req.file)
+        console.log('we also have ', req.body)
 
-        req.busboy.on('file', (fieldname, readableStream, filename) => {
-            console.log(`someone is posting a file with fieldname ${fieldname} filename ${filename}`)
-            let writeStream = gridStream.createWriteStream({
-                filename: filename,
-                metadata: {
-                    title: "bananas"
-                }
-            })
-            readableStream.on('error', err => {
-                console.log('readable stream error', err)
+        let cfg = {
+            filename: req.file.originalname,
+            metadata: req.body
+        }
+
+        grid.writeFile(cfg, req.file.buffer, (err, file) => {
+            if (err) {
                 res.status(500).json({
-                    "error": err
+                    error: err
                 })
-            })
-            writeStream.on('error', err => {
-                console.log('error', err)
-                res.status(500).json({
-                    "error": err
-                })
-            })
-            readableStream.on('end', x => {
+            } else {
+                console.log(`saved ${req.file.originalname}`)
                 res.json({
-                    "result": `saved ${filename} to gridfs ${x}`
+                    result: `saved ${req.file.originalname}`
                 })
-            })
-            readableStream.pipe(writeStream)
+            }
         })
+
     }
 
 
@@ -115,7 +109,7 @@ module.exports = (() => {
 
 
 
-    app.post('/saveimage', saveImage)
+    app.post('/saveimage', upload.single('file'), saveImage)
     app.get('/image', getImage)
 
     app.listen(port, '0.0.0.0', () => {
