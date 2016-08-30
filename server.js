@@ -62,34 +62,33 @@ module.exports = (() => {
     let saveImage = (req, res) => {
         console.log('handling')
         req.pipe(req.busboy)
-        let fdata = []
-        let allFileData;
+
         req.busboy.on('file', (fieldname, readableStream, filename) => {
-
-            readableStream.on('data', data => {
-                fdata.push(data)
-            })
-            readableStream.on('end', () => {
-                allFileData = Buffer.concat(fdata)
-
-                let cfg = {
-                    filename: filename
+            console.log(`someone is posting a file with fieldname ${fieldname} filename ${filename}`)
+            let writeStream = gridStream.createWriteStream({
+                filename: filename,
+                metadata: {
+                    title: "bananas"
                 }
-                grid.writeFile(cfg, allFileData, (err, file) => {
-                    if (err) {
-                        console.log('error writing', err)
-                        res.status(500).json({
-                            "error": err
-                        })
-                    } else {
-                        console.log('saved %s to GridFS file %s', filename, file._id);
-                        res.json({
-                            'result': 'saved to GridFS file '
-                        })
-                    }
+            })
+            readableStream.on('error', err => {
+                console.log('readable stream error', err)
+                res.status(500).json({
+                    "error": err
                 })
             })
-
+            writeStream.on('error', err => {
+                console.log('error', err)
+                res.status(500).json({
+                    "error": err
+                })
+            })
+            readableStream.on('end', x => {
+                res.json({
+                    "result": `saved ${filename} to gridfs ${x}`
+                })
+            })
+            readableStream.pipe(writeStream)
         })
     }
 
